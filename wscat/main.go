@@ -35,7 +35,9 @@ func main() {
 		}
 		if err := scanner.Err(); err != nil {
 			log.Fatalf("error scanning stdin: %s", err)
+			os.Exit(1)
 		}
+		os.Exit(0)
 	}(conn)
 
 	for {
