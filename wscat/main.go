@@ -32,7 +32,6 @@ func main() {
 
 		for scanner.Scan() {
 			s := scanner.Text()
-			fmt.Println("send=", s)
 			websocket.Message.Send(conn, scanner.Text())
 		}
 		if err := scanner.Err(); err != nil {
@@ -46,6 +45,6 @@ func main() {
 		if err != nil {
 			log.Fatal("error recv: ", err)
 		}
-		fmt.Println("recv=", msg)
+		fmt.Println(msg)
 	}
 }
