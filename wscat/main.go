@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -12,6 +13,10 @@ import (
 )
 
 func main() {
+	var binary, binarySend, binaryReceive bool
+	flag.BoolVar(&binary, "b", false, "use binary messages (overrides -bs and -br)")
+	flag.BoolVar(&binarySend, "bs", false, "send binary messages")
+	flag.BoolVar(&binaryReceive, "br", false, "receive binary messages")
 	flag.Parse()
 	rawurl := flag.Arg(0)
 
@@ -21,31 +26,59 @@ func main() {
 		log.Fatal("error parsing: ", err)
 	}
 
-	conn, err := websocket.Dial(rawurl, "tcp", "http://"+u.Host)
+	if binary {
+		binaryReceive = true
+		binarySend = true
+	}
 
+	conn, err := websocket.Dial(rawurl, "tcp", "http://"+u.Host)
 	if err != nil {
 		log.Fatal("error dialing: ", err)
 	}
 
 	go func(conn *websocket.Conn) {
 		scanner := bufio.NewScanner(os.Stdin)
+		if binarySend {
+			scanner.Split(bufio.ScanBytes)
+		}
 
 		for scanner.Scan() {
-			websocket.Message.Send(conn, scanner.Text())
+			var toSend interface{}
+			if binarySend {
+				toSend = scanner.Bytes()
+			} else {
+				toSend = scanner.Text()
+			}
+			if err := websocket.Message.Send(conn, toSend); err != nil {
+				log.Fatalf("error writing message: %s", err)
+			}
 		}
-		if err := scanner.Err(); err != nil {
+		if err := scanner.Err(); err != nil && err != io.EOF {
 			log.Fatalf("error scanning stdin: %s", err)
-			os.Exit(1)
 		}
+		// We are done, force exit in case the receiver is blocked
 		os.Exit(0)
 	}(conn)
 
+	var msg string
+	var binMsg []byte
+	var toReceive interface{} = &msg
+	if binaryReceive {
+		toReceive = &binMsg
+	}
+
 	for {
-		var msg string
-		err := websocket.Message.Receive(conn, &msg)
+		err := websocket.Message.Receive(conn, toReceive)
 		if err != nil {
-			log.Fatal("error recv: ", err)
+			if err != io.EOF {
+				log.Fatal("error recv: ", err)
+			}
+			break
 		}
-		fmt.Println(msg)
+		if binaryReceive {
+			os.Stdout.Write(binMsg)
+		} else {
+			fmt.Println(msg)
+		}
 	}
 }
