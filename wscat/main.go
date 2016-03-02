@@ -68,8 +68,7 @@ func main() {
 	}
 
 	for {
-		err := websocket.Message.Receive(conn, toReceive)
-		if err != nil {
+		if err := websocket.Message.Receive(conn, toReceive); err != nil {
 			if err != io.EOF {
 				log.Fatal("error recv: ", err)
 			}
